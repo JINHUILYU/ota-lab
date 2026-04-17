@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -17,6 +18,8 @@ MANIFEST_PATH = STORAGE_DIR / "manifest.json"
 
 def sign_package(package_bytes: bytes, private_key_path: Path) -> str:
     private_key = load_pem_private_key(private_key_path.read_bytes(), password=None)
+    if not isinstance(private_key, Ed25519PrivateKey):
+        raise TypeError("private key type must be Ed25519")
     signature = private_key.sign(package_bytes)
     return base64.b64encode(signature).decode("ascii")
 

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import requests
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 
 
@@ -91,6 +92,8 @@ def verify_sha256(package_path: Path, expected_sha256: str) -> None:
 
 def verify_signature(package_path: Path, signature_b64: str, public_key_path: Path) -> None:
     public_key = load_pem_public_key(public_key_path.read_bytes())
+    if not isinstance(public_key, Ed25519PublicKey):
+        raise OtaError("公钥类型无效：需要 Ed25519 公钥")
     signature = base64.b64decode(signature_b64, validate=True)
     package_bytes = package_path.read_bytes()
     public_key.verify(signature, package_bytes)
