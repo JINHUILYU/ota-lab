@@ -1,6 +1,6 @@
 # OTA Lab
 
-单机 OTA 学习实验：用 Python + Flask + QEMU 模拟真实设备升级流程，覆盖 **A/B 分区切换、签名校验、自动重启、失败回滚**。
+单机 OTA：使用 Python + Flask + QEMU 模拟真实设备升级流程，覆盖 **A/B 分区切换、签名校验、自动重启、失败回滚**。
 
 ## 项目包含什么
 
@@ -53,6 +53,31 @@ uv run python scripts/publish_release.py --version 1.2.0
 预期：新 slot 启动失败后自动回滚，版本保持 `1.1.0`。
 
 ## QEMU 真设备演示
+
+先在 **host** 执行一次初始化（不是在 guest 里执行）：
+
+```bash
+uv run python scripts/setup_demo.py
+```
+
+用途：生成密钥与升级包（`server/storage/packages`），供 QEMU guest 后续 OTA 下载与验证。
+
+### 执行流程与命令作用
+
+```text
+Host: setup/publish/server/qemu scripts
+  -> Guest: ota-device.service (拉 manifest、下载升级包、A/B 切换、重启确认)
+```
+
+| 在哪执行 | 指令 | 目的 |
+|---|---|---|
+| host | `uv run python scripts/setup_demo.py` | 生成密钥、升级包、初始化演示资产 |
+| host | `uv run python server/app.py --host 0.0.0.0 --port 8000` | 启动 OTA 服务端，供 guest 拉取 manifest 与包 |
+| host | `uv run python scripts/qemu_prepare.py` | 生成 QEMU 运行资产（overlay/seed/cloud-init） |
+| host | `uv run python scripts/qemu_prepare.py --reset-disk` | 强制重建 guest 磁盘，应用新的 cloud-init 配置 |
+| host | `uv run python scripts/qemu_run.py` | 启动 QEMU 虚拟机 |
+| host | `uv run python scripts/publish_release.py --version <ver> --server-url http://10.0.2.2:8000` | 发布新版本（`10.0.2.2` 为 guest 访问 host 地址） |
+| guest | `sudo journalctl -fu ota-device.service --no-pager` | 实时观察 OTA 检测、升级、回滚日志 |
 
 1. 以 host 可访问方式启动 OTA 服务端：
 
