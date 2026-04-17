@@ -45,7 +45,7 @@ uv run python device_sim/client.py
 4. **设备常驻模型**（`device_sim/agent.py` + `device_sim/firmware_runner.py`）  
    `agent.py` 持续运行并周期执行 OTA 检查；`firmware_runner.py` 模拟设备业务循环（计数）并持久化到 `runtime/data/state.json`。检测到 OTA 成功后，agent 会重启 runner 以模拟设备重启生效。
 5. **QEMU 真设备骨架**（`scripts/qemu_prepare.py` + `scripts/qemu_run.py` + `scripts/qemu_guest_init.py`）  
-   `qemu_prepare.py` 生成 cloud image overlay 与 cloud-init seed；`qemu_run.py` 以 9p 挂载仓库并启动 guest；guest 首次引导自动初始化 runtime 并以 `agent --restart-mode system` 运行 OTA。
+   `qemu_prepare.py` 生成 cloud image overlay 与 cloud-init seed；`qemu_run.py` 以 9p 挂载仓库并启动 guest（会自动选择可用加速器并兼容回退到 `tcg`）；guest 首次引导自动初始化 runtime 并以 `agent --restart-mode system` 运行 OTA。
 
 ## 关键约定（仓库特有）
 

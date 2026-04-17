@@ -117,6 +117,12 @@ uv run python scripts/qemu_prepare.py
 uv run python scripts/qemu_run.py
 ```
 
+`qemu_run.py` 会自动选择可用加速器（`hvf/kvm/whpx/tcg`）。如果你要手动指定，可用：
+
+```bash
+uv run python scripts/qemu_run.py --accel tcg --cpu-model max
+```
+
 3. guest 首次启动后会自动：
    - 执行 `scripts/qemu_guest_init.py` 初始化 `/var/lib/ota-runtime` 为 `1.0.0`
    - 启动 `device_sim/agent.py`（`--restart-mode system`），OTA 成功后触发整机重启
