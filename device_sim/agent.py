@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import subprocess
 import sys
 import time
@@ -89,6 +90,14 @@ def restart_runner(
     return start_runner(runtime_dir, tick_interval, slot)
 
 
+def reboot_system(command: str) -> None:
+    cmd = shlex.split(command)
+    if not cmd:
+        raise ValueError("system reboot command 不能为空")
+    print(f"[agent] 执行系统重启命令: {command}", flush=True)
+    subprocess.run(cmd, check=True)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="device OTA agent")
     parser.add_argument("--server", default="http://127.0.0.1:8000", help="OTA server base URL")
@@ -118,6 +127,17 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=30.0,
         help="pending 版本超时秒数，超时后自动回滚",
+    )
+    parser.add_argument(
+        "--restart-mode",
+        choices=["runner", "system"],
+        default="runner",
+        help="OTA 成功后重启策略：runner=仅重启固件进程，system=重启整机",
+    )
+    parser.add_argument(
+        "--system-reboot-command",
+        default="systemctl reboot",
+        help="restart-mode=system 时执行的系统重启命令",
     )
     return parser
 
@@ -222,6 +242,10 @@ def main() -> int:
                 continue
             if updated:
                 boot_state = load_boot_state(boot_path(runtime_dir))
+                if args.restart_mode == "system":
+                    stop_runner(runner)
+                    reboot_system(args.system_reboot_command)
+                    return 0
                 runner = restart_runner(
                     runner,
                     runtime_dir,

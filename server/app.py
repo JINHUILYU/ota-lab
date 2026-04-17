@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -34,5 +35,14 @@ def download_package(filename: str):
     return send_from_directory(str(PACKAGES_DIR), filename, as_attachment=True)
 
 
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="OTA server")
+    parser.add_argument("--host", default="127.0.0.1", help="listen host")
+    parser.add_argument("--port", type=int, default=8000, help="listen port")
+    parser.add_argument("--debug", action="store_true", help="enable Flask debug mode")
+    return parser
+
+
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=8000, debug=False)
+    args = build_parser().parse_args()
+    app.run(host=args.host, port=args.port, debug=args.debug)
