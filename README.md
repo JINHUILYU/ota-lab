@@ -146,3 +146,36 @@ uv run python scripts/publish_release.py --version 1.1.0
 ```text
 ubuntu / ubuntu
 ```
+
+## 9. QEMU 调试经验（已验证）
+
+1. **看到 cloud-init 完成不代表 OTA 在运行**  
+   OTA agent 的实时日志在 systemd journal，不会持续打印在登录界面：
+
+```bash
+sudo journalctl -fu ota-device.service --no-pager
+```
+
+2. **guest 必须使用 `10.0.2.2` 访问 host OTA 服务**  
+   发版时务必指定：
+
+```bash
+uv run python scripts/publish_release.py --version 1.1.0 --server-url http://10.0.2.2:8000
+```
+
+3. **修改 cloud-init / qemu_prepare 后必须重建磁盘**  
+   否则 guest 会继续使用旧 cloud-init 配置：
+
+```bash
+uv run python scripts/qemu_prepare.py --reset-disk
+```
+
+4. **自动重启不等于升级成功**  
+   以 runtime 状态文件为准：
+
+```bash
+cat /var/lib/ota-runtime/metadata.json
+cat /var/lib/ota-runtime/boot.json
+```
+
+升级成功预期：`version=1.1.0`，`pending_slot=null`。
