@@ -32,6 +32,7 @@ def choose_accelerator(qemu_bin: str, requested: str) -> str:
             raise ValueError(f"qemu 不支持加速器 {requested}，可用: {', '.join(sorted(supported))}")
         return requested
 
+    # Prefer hardware acceleration, but always keep tcg as software fallback.
     for candidate in ("hvf", "kvm", "whpx", "tcg"):
         if candidate in supported:
             return candidate
@@ -41,6 +42,7 @@ def choose_accelerator(qemu_bin: str, requested: str) -> str:
 def choose_cpu_model(accel: str, requested: str) -> str:
     if requested != "auto":
         return requested
+    # "host" is invalid for pure emulation (tcg) on some builds.
     if accel == "tcg":
         return "max"
     return "host"

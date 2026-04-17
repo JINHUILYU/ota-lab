@@ -53,6 +53,7 @@ def load_runner_status(status_path: Path) -> RunnerStatus:
 
 
 def manifest_identity(manifest) -> str:
+    # Use full manifest fingerprint to avoid over-blocking by version only.
     return "|".join(
         [
             manifest.version,
@@ -177,6 +178,7 @@ def main() -> int:
 
             if runner.poll() is not None:
                 if boot_state.pending_slot is not None:
+                    # Pending boot failed; block this exact manifest payload until it changes.
                     blocked_manifest = pending_manifest
                     print(
                         f"[agent] pending 固件启动失败，执行回滚 slot={boot_state.previous_slot}",
@@ -195,6 +197,7 @@ def main() -> int:
                     boot_state.pending_started_at is not None
                     and time.time() - boot_state.pending_started_at > args.pending_timeout
                 ):
+                    # Timed out during pending confirmation; rollback and mark current payload blocked.
                     blocked_manifest = pending_manifest
                     print(
                         f"[agent] pending 超时，回滚到 slot={boot_state.previous_slot}",
@@ -240,6 +243,7 @@ def main() -> int:
             current_manifest = manifest_identity(manifest)
             if blocked_manifest is not None:
                 if current_manifest == blocked_manifest:
+                    # Same failed payload keeps being published; skip to avoid reboot loops.
                     print(
                         f"[agent] 跳过已失败发布：version={manifest.version}，等待发布内容变化",
                         flush=True,
