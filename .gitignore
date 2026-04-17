@@ -13,3 +13,4 @@ wheels/
 device_sim/runtime/
 server/storage/
 server/keys/
+qemu_runtime/
