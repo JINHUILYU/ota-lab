@@ -85,11 +85,12 @@ write_files:
 
       [Service]
       Type=simple
-      WorkingDirectory=/mnt/host
+      WorkingDirectory=/
       ExecStartPre=/bin/mkdir -p /mnt/host
       ExecStartPre=/bin/sh -lc 'modprobe 9pnet_virtio || true'
       ExecStartPre=/bin/sh -lc 'modprobe 9p || true'
       ExecStartPre=/bin/sh -lc 'for i in 1 2 3 4 5; do mountpoint -q /mnt/host && exit 0; mount -t 9p -o trans=virtio,version=9p2000.L hostshare /mnt/host && exit 0; sleep 1; done; exit 1'
+      ExecStartPre=/bin/sh -lc 'test -f /mnt/host/device_sim/agent.py'
       ExecStartPre=/usr/bin/python3 /mnt/host/scripts/qemu_guest_init.py --runtime-dir {guest_runtime_dir} --packages-dir /mnt/host/packages --initial-version {initial_version}
       ExecStart=/usr/bin/python3 /mnt/host/device_sim/agent.py --server {ota_server_url} --runtime-dir {guest_runtime_dir} --public-key /mnt/host/server/keys/public.pem --check-interval {check_interval} --tick-interval {tick_interval} --confirm-ticks {confirm_ticks} --pending-timeout {pending_timeout} --restart-mode system --system-reboot-command "systemctl reboot"
       Restart=always
