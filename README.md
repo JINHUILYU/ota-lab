@@ -179,3 +179,45 @@ cat /var/lib/ota-runtime/boot.json
 ```
 
 升级成功预期：`version=1.1.0`，`pending_slot=null`。
+
+## 10. OTA 流程详解（QEMU 场景）
+
+- `1.0.0` 和 `1.1.0` 都会在虚拟机启动后自动运行（由 `ota-device.service` 拉起 agent，再拉起当前 active slot 的 runner）。
+- 两个版本在本项目里的可见业务差异主要是 `app.txt` 里的 `step`：`1.0.0=+1`，`1.1.0=+2`。
+- QEMU 运行后，agent 会按间隔自动检测 OTA；发现新版本后执行 A/B 切换并触发系统重启。
+
+### 10.1 启动后“谁在运行”
+
+1. QEMU 启动 -> cloud-init 执行 -> systemd 启动 `ota-device.service`。
+2. `ota-device.service` 启动 `device_sim/agent.py`。
+3. agent 读取 `/var/lib/ota-runtime/boot.json` 的 `active_slot`，拉起对应 slot 的 `firmware_runner.py`。
+4. runner 读取该 slot 内的 `app.txt`（版本、message、step），并持续计数写入 `state.json`。
+
+### 10.2 一次成功 OTA 的完整时序
+
+1. agent 拉取 `manifest.json`。  
+2. 比较 `manifest.version` 和本地 `metadata.json.version`。  
+3. 新版本可升级时，下载 zip 包并做 SHA256/签名校验。  
+4. 解压到 inactive slot（例如当前 `a`，则写入 `b`）。  
+5. 更新 `boot.json`：切换 `active_slot` 到新 slot，并标记 `pending_*`。  
+6. 由于 QEMU 场景使用 `--restart-mode system`，agent 执行整机重启。  
+7. 重启后 runner 从新 slot 启动；agent 观察到 pending 版本稳定运行达到阈值（`confirm-ticks`）后确认提交，清空 `pending_*`。
+
+### 10.3 升级失败时会发生什么
+
+1. 新 slot 启动失败（例如 `health.txt != ok`）或 pending 超时。  
+2. agent 回滚：恢复 `active_slot` 和旧版本号。  
+3. 为避免抖动，agent 会临时跳过“刚失败的 manifest 内容”（按 manifest 指纹），直到发布内容变化后再尝试。
+
+### 10.4 如何确认“真的升上去了”
+
+```bash
+cat /var/lib/ota-runtime/metadata.json
+cat /var/lib/ota-runtime/boot.json
+cat /var/lib/ota-runtime/data/runner_status.json
+```
+
+成功升级到 `1.1.0` 的典型状态：
+- `metadata.json.version == "1.1.0"`
+- `boot.json.pending_slot == null`
+- `runner_status.json.version == "1.1.0"` 且计数步长表现为 `+2`
