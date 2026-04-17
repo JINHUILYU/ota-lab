@@ -5,6 +5,8 @@ import base64
 import hashlib
 import json
 import shutil
+import sys
+import time
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,6 +14,20 @@ from pathlib import Path
 import requests
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+from device_sim.runtime_state import (
+    BootState,
+    boot_path,
+    ensure_runtime_layout,
+    load_boot_state,
+    other_slot,
+    save_boot_state,
+    slot_path,
+)
 
 
 class OtaError(RuntimeError):
@@ -108,59 +124,126 @@ def health_check(current_dir: Path) -> None:
         raise OtaError(f"升级后健康检查失败：health={state}")
 
 
-def extract_to_staged(package_path: Path, staged_dir: Path) -> None:
-    if staged_dir.exists():
-        shutil.rmtree(staged_dir)
-    staged_dir.mkdir(parents=True, exist_ok=True)
+def extract_to_slot(package_path: Path, target_slot_dir: Path) -> None:
+    if target_slot_dir.exists():
+        shutil.rmtree(target_slot_dir)
+    target_slot_dir.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(package_path, "r") as archive:
-        archive.extractall(staged_dir)
+        archive.extractall(target_slot_dir)
 
 
-def install_with_rollback(runtime_dir: Path, metadata_path: Path, target_version: str) -> None:
-    current_dir = runtime_dir / "current"
-    backup_dir = runtime_dir / "backup"
-    staged_dir = runtime_dir / "staged"
-    previous_version = load_current_version(metadata_path)
-    if not current_dir.exists():
-        raise OtaError(f"缺少 current 目录: {current_dir}")
-
-    if backup_dir.exists():
-        shutil.rmtree(backup_dir)
-    shutil.copytree(current_dir, backup_dir)
-
-    try:
-        shutil.rmtree(current_dir)
-        shutil.move(str(staged_dir), str(current_dir))
-        health_check(current_dir)
-    except (OtaError, OSError, zipfile.BadZipFile) as exc:
-        if current_dir.exists():
-            shutil.rmtree(current_dir)
-        shutil.move(str(backup_dir), str(current_dir))
-        save_current_version(metadata_path, previous_version)
-        raise OtaError(f"升级失败，已自动回滚到 {previous_version}: {exc}") from exc
-
-    shutil.rmtree(backup_dir)
+def mark_pending_update(
+    runtime_dir: Path,
+    metadata_path: Path,
+    current_boot: BootState,
+    target_version: str,
+    previous_version: str,
+) -> None:
+    target_slot = other_slot(current_boot.active_slot)
+    save_boot_state(
+        boot_path(runtime_dir),
+        BootState(
+            active_slot=target_slot,
+            pending_slot=target_slot,
+            previous_slot=current_boot.active_slot,
+            pending_version=target_version,
+            previous_version=previous_version,
+            pending_started_at=time.time(),
+        ),
+    )
     save_current_version(metadata_path, target_version)
 
 
-def run_update(server_base_url: str, runtime_dir: Path, public_key_path: Path, timeout: int) -> None:
+def confirm_pending_update(runtime_dir: Path) -> bool:
+    state = load_boot_state(boot_path(runtime_dir))
+    if state.pending_slot is None:
+        return False
+    save_boot_state(
+        boot_path(runtime_dir),
+        BootState(
+            active_slot=state.active_slot,
+            pending_slot=None,
+            previous_slot=None,
+            pending_version=None,
+            previous_version=None,
+            pending_started_at=None,
+        ),
+    )
+    return True
+
+
+def rollback_pending_update(runtime_dir: Path) -> bool:
+    state = load_boot_state(boot_path(runtime_dir))
+    if state.pending_slot is None:
+        return False
+    if state.previous_slot is None or state.previous_version is None:
+        raise OtaError("pending 回滚状态损坏：缺少 previous_slot 或 previous_version")
+
+    save_boot_state(
+        boot_path(runtime_dir),
+        BootState(
+            active_slot=state.previous_slot,
+            pending_slot=None,
+            previous_slot=None,
+            pending_version=None,
+            previous_version=None,
+            pending_started_at=None,
+        ),
+    )
+    save_current_version(runtime_dir / "metadata.json", state.previous_version)
+    return True
+
+
+def run_update(
+    server_base_url: str,
+    runtime_dir: Path,
+    public_key_path: Path,
+    timeout: int,
+    defer_confirm: bool = False,
+) -> bool:
     runtime_dir.mkdir(parents=True, exist_ok=True)
+    ensure_runtime_layout(runtime_dir)
     metadata_path = runtime_dir / "metadata.json"
+    boot_state = load_boot_state(boot_path(runtime_dir))
+    if boot_state.pending_slot is not None:
+        print(
+            f"[device] 存在待确认版本：slot={boot_state.pending_slot}, version={boot_state.pending_version}"
+        )
+        return False
     current_version = load_current_version(metadata_path)
 
     manifest = fetch_manifest(f"{server_base_url.rstrip('/')}/manifest.json", timeout)
     if parse_version(manifest.version) <= parse_version(current_version):
         print(f"[device] 已是最新版本：{current_version}")
-        return
+        return False
 
     print(f"[device] 发现新版本：{current_version} -> {manifest.version}")
     package_path = runtime_dir / "downloads" / manifest.package
     download_package(manifest.url, package_path, timeout)
     verify_sha256(package_path, manifest.sha256)
     verify_signature(package_path, manifest.signature, public_key_path)
-    extract_to_staged(package_path, runtime_dir / "staged")
-    install_with_rollback(runtime_dir, metadata_path, manifest.version)
-    print(f"[device] 升级成功，当前版本：{manifest.version}")
+    target_slot = other_slot(boot_state.active_slot)
+    extract_to_slot(package_path, slot_path(runtime_dir, target_slot))
+    mark_pending_update(
+        runtime_dir=runtime_dir,
+        metadata_path=metadata_path,
+        current_boot=boot_state,
+        target_version=manifest.version,
+        previous_version=current_version,
+    )
+    if defer_confirm:
+        print(f"[device] 升级包已切换到 slot={target_slot}，等待设备启动确认")
+        return True
+
+    try:
+        health_check(slot_path(runtime_dir, target_slot))
+        confirm_pending_update(runtime_dir)
+    except OtaError as exc:
+        rollback_pending_update(runtime_dir)
+        raise OtaError(f"升级失败，已自动回滚到 {current_version}: {exc}") from exc
+
+    print(f"[device] 升级成功，当前版本：{manifest.version} (slot={target_slot})")
+    return True
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -191,7 +274,7 @@ def main() -> int:
             public_key_path=args.public_key,
             timeout=args.timeout,
         )
-    except (OtaError, requests.RequestException, ValueError) as exc:
+    except (OtaError, requests.RequestException, ValueError, FileNotFoundError) as exc:
         print(f"[device] {exc}")
         return 1
     return 0
