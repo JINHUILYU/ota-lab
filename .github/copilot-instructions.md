@@ -55,7 +55,7 @@ uv run python device_sim/client.py
  - 升级成功条件依赖包内 `health.txt`，且内容必须是 `ok`；`packages/1.2.0/health.txt=broken` 是刻意保留的回滚演示样例。
  - 运行态目录约定：`device_sim/runtime/{slots/{a,b},boot.json,downloads,metadata.json,data/*}`。A/B 切换以 `boot.json.active_slot` 为准。
 - `boot.json` 的 `pending_*` 字段表示“待确认启动”状态；agent 达到确认条件后清空 pending，失败则回滚到 `previous_slot`。
-- agent 会临时跳过“刚刚启动失败”的版本，直到服务端发布了新的 manifest 版本，避免坏版本反复抖动。
+- agent 会临时跳过“刚刚启动失败”的发布内容，直到 manifest 内容变化后再尝试，避免坏发布反复抖动。
 - `agent` 支持 `--restart-mode runner|system`；QEMU 场景必须使用 `system` 以触发虚拟机内重启。
 - QEMU cloud-init 默认开启实验账号 `ubuntu/ubuntu`；仅用于本地调试，不用于生产环境。
 - 常驻计数状态存储在 `device_sim/runtime/data/state.json`，runner 每次 tick 都会写回；重启后应从该文件恢复计数。

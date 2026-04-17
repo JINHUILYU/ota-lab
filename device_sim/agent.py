@@ -52,6 +52,18 @@ def load_runner_status(status_path: Path) -> RunnerStatus:
     return RunnerStatus(slot=slot, version=version, ticks_since_start=ticks_since_start)
 
 
+def manifest_identity(manifest) -> str:
+    return "|".join(
+        [
+            manifest.version,
+            manifest.package,
+            manifest.url,
+            manifest.sha256,
+            manifest.signature,
+        ]
+    )
+
+
 def start_runner(runtime_dir: Path, tick_interval: float, slot: str) -> subprocess.Popen[bytes]:
     runner_path = Path(__file__).resolve().parent / "firmware_runner.py"
     command = [
@@ -156,7 +168,8 @@ def main() -> int:
     print(f"[agent] 设备启动，当前版本: {version}, active_slot={boot_state.active_slot}", flush=True)
 
     runner = start_runner(runtime_dir, args.tick_interval, boot_state.active_slot)
-    blocked_version: str | None = None
+    blocked_manifest: str | None = None
+    pending_manifest: str | None = None
     try:
         while True:
             time.sleep(args.check_interval)
@@ -164,12 +177,13 @@ def main() -> int:
 
             if runner.poll() is not None:
                 if boot_state.pending_slot is not None:
-                    blocked_version = boot_state.pending_version
+                    blocked_manifest = pending_manifest
                     print(
                         f"[agent] pending 固件启动失败，执行回滚 slot={boot_state.previous_slot}",
                         flush=True,
                     )
                     rollback_pending_update(runtime_dir)
+                    pending_manifest = None
                     boot_state = load_boot_state(boot_path(runtime_dir))
                 else:
                     print("[agent] 固件进程异常退出，正在拉起", flush=True)
@@ -181,12 +195,13 @@ def main() -> int:
                     boot_state.pending_started_at is not None
                     and time.time() - boot_state.pending_started_at > args.pending_timeout
                 ):
-                    blocked_version = boot_state.pending_version
+                    blocked_manifest = pending_manifest
                     print(
                         f"[agent] pending 超时，回滚到 slot={boot_state.previous_slot}",
                         flush=True,
                     )
                     rollback_pending_update(runtime_dir)
+                    pending_manifest = None
                     boot_state = load_boot_state(boot_path(runtime_dir))
                     runner = restart_runner(
                         runner,
@@ -209,25 +224,28 @@ def main() -> int:
                     continue
                 if status.ticks_since_start >= args.confirm_ticks:
                     confirm_pending_update(runtime_dir)
+                    pending_manifest = None
                     print(
                         f"[agent] pending 版本确认成功：slot={status.slot}, version={status.version}",
                         flush=True,
                     )
                 continue
 
-            if blocked_version is not None:
-                try:
-                    manifest = fetch_manifest(f"{args.server.rstrip('/')}/manifest.json", args.timeout)
-                except (OtaError, requests.RequestException, ValueError, FileNotFoundError) as exc:
-                    print(f"[agent] OTA 检查失败: {exc}", flush=True)
-                    continue
-                if manifest.version == blocked_version:
+            try:
+                manifest = fetch_manifest(f"{args.server.rstrip('/')}/manifest.json", args.timeout)
+            except (OtaError, requests.RequestException, ValueError, FileNotFoundError) as exc:
+                print(f"[agent] OTA 检查失败: {exc}", flush=True)
+                continue
+
+            current_manifest = manifest_identity(manifest)
+            if blocked_manifest is not None:
+                if current_manifest == blocked_manifest:
                     print(
-                        f"[agent] 跳过已失败版本：{blocked_version}，等待新发布",
+                        f"[agent] 跳过已失败发布：version={manifest.version}，等待发布内容变化",
                         flush=True,
                     )
                     continue
-                blocked_version = None
+                blocked_manifest = None
 
             try:
                 updated = run_update(
@@ -241,6 +259,7 @@ def main() -> int:
                 print(f"[agent] OTA 检查失败: {exc}", flush=True)
                 continue
             if updated:
+                pending_manifest = current_manifest
                 boot_state = load_boot_state(boot_path(runtime_dir))
                 if args.restart_mode == "system":
                     stop_runner(runner)

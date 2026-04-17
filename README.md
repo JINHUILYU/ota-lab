@@ -61,7 +61,7 @@ uv run python scripts/publish_release.py --version 1.1.0
 uv run python scripts/publish_release.py --version 1.2.0
 ```
 
-预期：agent 自动尝试升级，新 slot 启动失败后自动回滚到旧 slot，当前版本保持 `1.1.0`，固件继续运行。该失败版本会被临时拉黑，等待发布新版本后再尝试。
+预期：agent 自动尝试升级，新 slot 启动失败后自动回滚到旧 slot，当前版本保持 `1.1.0`，固件继续运行。该失败发布会被临时跳过，直到 manifest 内容变化后再尝试。
 
 ## 6. 手动单次 OTA 检查（兼容原流程）
 
