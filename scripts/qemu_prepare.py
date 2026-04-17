@@ -66,16 +66,10 @@ package_update: true
 ssh_pwauth: true
 users:
   - default
-  - name: admin
-    gecos: OTA Demo Admin
-    groups: [sudo]
-    shell: /bin/bash
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    lock_passwd: false
 chpasswd:
   expire: false
   list: |
-    admin:admin
+    ubuntu:ubuntu
 packages:
   - python3
   - python3-requests

@@ -96,7 +96,7 @@ uv run python scripts/publish_release.py --version 1.1.0 --server-url http://10.
 sudo journalctl -fu ota-device.service --no-pager
 ```
 
-调试登录（仅实验环境）：`admin / admin`
+调试登录（仅实验环境）：`ubuntu / ubuntu`
 
 **退出 QEMU：`Ctrl+A`，然后 `x`。**
 
@@ -125,11 +125,27 @@ cat server/storage/manifest.json
 
 QEMU guest 对应路径前缀改为 `/var/lib/ota-runtime/`。
 
+```
+cat /var/lib/ota-runtime/metadata.json
+cat /var/lib/ota-runtime/boot.json
+cat /var/lib/ota-runtime/data/runner_status.json
+cat /var/lib/ota-runtime/data/state.json
+curl -s http://10.0.2.2:8000/manifest.json
+```
+
 ### 成功升级到 1.1.0 的判定
 
 - `metadata.json.version == "1.1.0"`
 - `boot.json.pending_slot == null`
 - `runner_status.json.version == "1.1.0"` 且计数步长表现为 `+2`
+
+
+```bash
+# 重启 OTA 设备服务（修改配置或脚本后常用）
+sudo systemctl restart ota-device.service
+# 持续跟踪服务日志，观察 OTA 检测/升级/回滚过程
+sudo journalctl -fu ota-device.service --no-pager
+```
 
 ### 常见问题
 

@@ -20,7 +20,7 @@ KEYS_DIR = BASE_DIR / "server" / "keys"
 STORAGE_DIR = BASE_DIR / "server" / "storage"
 STORAGE_PACKAGES_DIR = STORAGE_DIR / "packages"
 DEVICE_RUNTIME_DIR = BASE_DIR / "device_sim" / "runtime"
-VERSIONS = ("1.0.0", "1.1.0", "1.2.0")
+VERSIONS = ("1.0.0", "1.1.0", "1.2.0", "1.3.0")
 
 
 def ensure_keys() -> None:
