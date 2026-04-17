@@ -64,10 +64,18 @@ def render_cloud_init_user_data(
     return f"""#cloud-config
 package_update: true
 ssh_pwauth: true
+users:
+  - default
+  - name: admin
+    gecos: OTA Demo Admin
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: false
 chpasswd:
   expire: false
   list: |
-    ubuntu:ubuntu
+    admin:admin
 packages:
   - python3
   - python3-requests

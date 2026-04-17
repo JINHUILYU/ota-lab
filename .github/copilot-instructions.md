@@ -58,7 +58,7 @@ uv run python device_sim/client.py
 - `boot.json` 的 `pending_*` 字段表示“待确认启动”状态；agent 达到确认条件后清空 pending，失败则回滚到 `previous_slot`。
 - agent 会临时跳过“刚刚启动失败”的发布内容，直到 manifest 内容变化后再尝试，避免坏发布反复抖动。
 - `agent` 支持 `--restart-mode runner|system`；QEMU 场景必须使用 `system` 以触发虚拟机内重启。
-- QEMU cloud-init 默认开启实验账号 `ubuntu/ubuntu`；仅用于本地调试，不用于生产环境。
+- QEMU cloud-init 默认开启实验账号 `admin/admin`；仅用于本地调试，不用于生产环境。
 - QEMU 调试优先看 `journalctl -fu ota-device.service`，不要仅看 cloud-init 启动输出。
 - QEMU 场景发布 manifest 时应使用 `--server-url http://10.0.2.2:8000`，避免包下载回环到 guest 自身。
 - 修改 `qemu_prepare.py` 或 cloud-init 配置后必须 `--reset-disk`，否则 guest 不会应用新配置。
