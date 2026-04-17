@@ -27,6 +27,12 @@ uv run python server/app.py
 
 默认监听 `http://127.0.0.1:8000`。
 
+如果要给 QEMU 虚拟机使用，请改成：
+
+```bash
+uv run python server/app.py --host 0.0.0.0 --port 8000
+```
+
 ## 3. 启动常驻设备（推荐）
 
 另开一个终端，在项目根目录执行：
@@ -96,3 +102,29 @@ cat device_sim/runtime/data/runner_status.json
 ```bash
 cat server/storage/manifest.json
 ```
+
+## 8. QEMU 真设备模型（WIP，可运行骨架）
+
+1. 准备 QEMU 运行资产（云镜像 + overlay 磁盘 + cloud-init seed）：
+
+```bash
+uv run python scripts/qemu_prepare.py
+```
+
+2. 启动 QEMU（默认把当前仓库通过 9p 挂载到 guest 的 `/mnt/host`）：
+
+```bash
+uv run python scripts/qemu_run.py
+```
+
+3. guest 首次启动后会自动：
+   - 执行 `scripts/qemu_guest_init.py` 初始化 `/var/lib/ota-runtime` 为 `1.0.0`
+   - 启动 `device_sim/agent.py`（`--restart-mode system`），OTA 成功后触发整机重启
+
+4. 在 host 发布版本触发 OTA：
+
+```bash
+uv run python scripts/publish_release.py --version 1.1.0
+```
+
+可在 QEMU 控制台观察：新版本拉取 -> 切 slot -> 系统重启 -> 新版本确认。
