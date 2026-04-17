@@ -111,6 +111,12 @@ cat server/storage/manifest.json
 uv run python scripts/qemu_prepare.py
 ```
 
+如果你修改了 `qemu_prepare.py` 或 cloud-init 配置，请重建磁盘触发完整首启流程：
+
+```bash
+uv run python scripts/qemu_prepare.py --reset-disk
+```
+
 2. 启动 QEMU（默认把当前仓库通过 9p 挂载到 guest 的 `/mnt/host`）：
 
 ```bash
@@ -134,3 +140,9 @@ uv run python scripts/publish_release.py --version 1.1.0
 ```
 
 可在 QEMU 控制台观察：新版本拉取 -> 切 slot -> 系统重启 -> 新版本确认。
+
+调试登录（仅实验环境）默认账号密码：
+
+```text
+ubuntu / ubuntu
+```
