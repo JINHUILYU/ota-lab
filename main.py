@@ -1,4 +1,5 @@
 def main():
+    """示例入口函数。"""
     print("Hello from ota-lab!")
 
 

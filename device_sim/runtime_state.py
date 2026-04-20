@@ -11,6 +11,8 @@ SlotName = Literal["a", "b"]
 
 @dataclass(frozen=True)
 class BootState:
+    """A/B 启动状态机快照。"""
+
     active_slot: SlotName
     pending_slot: SlotName | None
     previous_slot: SlotName | None
@@ -20,34 +22,41 @@ class BootState:
 
 
 def metadata_path(runtime_dir: Path) -> Path:
+    """返回 runtime 元数据文件路径。"""
     return runtime_dir / "metadata.json"
 
 
 def boot_path(runtime_dir: Path) -> Path:
+    """返回 boot 状态文件路径。"""
     return runtime_dir / "boot.json"
 
 
 def slot_path(runtime_dir: Path, slot: SlotName) -> Path:
+    """返回指定 slot 目录路径。"""
     return runtime_dir / "slots" / slot
 
 
 def other_slot(slot: SlotName) -> SlotName:
+    """返回另一个 slot 名称。"""
     return cast(SlotName, "b" if slot == "a" else "a")
 
 
 def _parse_slot(value: object, field_name: str) -> SlotName:
+    """解析并校验必填 slot 字段。"""
     if value not in ("a", "b"):
         raise ValueError(f"boot.{field_name} 无效: {value!r}")
     return cast(SlotName, value)
 
 
 def _parse_optional_slot(value: object, field_name: str) -> SlotName | None:
+    """解析并校验可选 slot 字段。"""
     if value is None:
         return None
     return _parse_slot(value, field_name)
 
 
 def load_boot_state(path: Path) -> BootState:
+    """从 boot.json 加载并校验状态。"""
     if not path.exists():
         raise FileNotFoundError(f"缺少 boot 状态文件: {path}")
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -80,6 +89,7 @@ def load_boot_state(path: Path) -> BootState:
 
 
 def save_boot_state(path: Path, state: BootState) -> None:
+    """持久化 boot 状态到 boot.json。"""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(
@@ -100,6 +110,7 @@ def save_boot_state(path: Path, state: BootState) -> None:
 
 
 def ensure_runtime_layout(runtime_dir: Path) -> None:
+    """确保 runtime 目录是 A/B 布局，必要时迁移旧结构。"""
     runtime_dir.mkdir(parents=True, exist_ok=True)
     slots_dir = runtime_dir / "slots"
     boot_file = boot_path(runtime_dir)

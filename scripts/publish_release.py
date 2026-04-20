@@ -17,6 +17,7 @@ MANIFEST_PATH = STORAGE_DIR / "manifest.json"
 
 
 def sign_package(package_bytes: bytes, private_key_path: Path) -> str:
+    """使用私钥对升级包签名并返回 Base64。"""
     private_key = load_pem_private_key(private_key_path.read_bytes(), password=None)
     if not isinstance(private_key, Ed25519PrivateKey):
         raise TypeError("private key type must be Ed25519")
@@ -25,6 +26,7 @@ def sign_package(package_bytes: bytes, private_key_path: Path) -> str:
 
 
 def build_manifest(version: str, server_url: str) -> dict[str, str]:
+    """构建并返回发布 manifest。"""
     package_name = f"ota-{version}.zip"
     package_path = PACKAGES_DIR / package_name
     if not package_path.exists():
@@ -45,6 +47,7 @@ def build_manifest(version: str, server_url: str) -> dict[str, str]:
 
 
 def main() -> int:
+    """发布命令入口。"""
     parser = argparse.ArgumentParser(description="Publish OTA manifest for a package version")
     parser.add_argument("--version", required=True, help="target package version, e.g. 1.1.0")
     parser.add_argument("--server-url", default="http://127.0.0.1:8000", help="OTA server URL")

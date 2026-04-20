@@ -10,6 +10,7 @@ DEFAULT_QEMU_RUNTIME_DIR = BASE_DIR / "qemu_runtime"
 
 
 def list_supported_accelerators(qemu_bin: str) -> set[str]:
+    """查询 qemu 支持的加速器集合。"""
     result = subprocess.run(
         [qemu_bin, "-accel", "help"],
         check=True,
@@ -26,6 +27,7 @@ def list_supported_accelerators(qemu_bin: str) -> set[str]:
 
 
 def choose_accelerator(qemu_bin: str, requested: str) -> str:
+    """根据请求值选择可用加速器。"""
     supported = list_supported_accelerators(qemu_bin)
     if requested != "auto":
         if requested not in supported:
@@ -40,6 +42,7 @@ def choose_accelerator(qemu_bin: str, requested: str) -> str:
 
 
 def choose_cpu_model(accel: str, requested: str) -> str:
+    """根据加速器选择 CPU 模型。"""
     if requested != "auto":
         return requested
     # "host" is invalid for pure emulation (tcg) on some builds.
@@ -59,6 +62,7 @@ def build_qemu_command(
     cpus: int,
     ssh_port: int,
 ) -> list[str]:
+    """构建 qemu 启动命令。"""
     return [
         qemu_bin,
         "-name",
@@ -90,6 +94,7 @@ def build_qemu_command(
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """构建 qemu 运行 CLI 参数。"""
     parser = argparse.ArgumentParser(description="Run OTA QEMU guest")
     parser.add_argument(
         "--qemu-runtime-dir",
@@ -122,6 +127,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """qemu 启动命令入口。"""
     args = build_parser().parse_args()
     runtime_dir: Path = args.qemu_runtime_dir
     disk_image = runtime_dir / "ota-guest.qcow2"

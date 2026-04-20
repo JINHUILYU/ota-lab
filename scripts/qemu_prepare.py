@@ -13,6 +13,7 @@ DEFAULT_BASE_IMAGE_URL = "https://cloud-images.ubuntu.com/jammy/current/jammy-se
 
 
 def run_command(command: list[str], dry_run: bool) -> None:
+    """执行命令，dry-run 时仅打印。"""
     print(f"[qemu-prepare] $ {shlex.join(command)}")
     if dry_run:
         return
@@ -20,6 +21,7 @@ def run_command(command: list[str], dry_run: bool) -> None:
 
 
 def ensure_base_image(base_image_path: Path, base_image_url: str, dry_run: bool) -> None:
+    """确保基础 cloud image 已下载。"""
     base_image_path.parent.mkdir(parents=True, exist_ok=True)
     if base_image_path.exists():
         return
@@ -27,6 +29,7 @@ def ensure_base_image(base_image_path: Path, base_image_url: str, dry_run: bool)
 
 
 def build_overlay_disk(base_image: Path, disk_image: Path, disk_size: str, reset_disk: bool, dry_run: bool) -> None:
+    """创建或重建 overlay 磁盘。"""
     disk_image.parent.mkdir(parents=True, exist_ok=True)
     if reset_disk and disk_image.exists():
         if dry_run:
@@ -61,6 +64,7 @@ def render_cloud_init_user_data(
     confirm_ticks: int,
     pending_timeout: float,
 ) -> str:
+    """生成 cloud-init user-data。"""
     return f"""#cloud-config
 package_update: true
 ssh_pwauth: true
@@ -109,6 +113,7 @@ runcmd:
 
 
 def write_seed_files(seed_dir: Path, user_data: str) -> tuple[Path, Path]:
+    """写入 cloud-init seed 文件。"""
     seed_dir.mkdir(parents=True, exist_ok=True)
     user_data_path = seed_dir / "user-data"
     meta_data_path = seed_dir / "meta-data"
@@ -121,6 +126,7 @@ def write_seed_files(seed_dir: Path, user_data: str) -> tuple[Path, Path]:
 
 
 def build_seed_iso(seed_dir: Path, seed_iso: Path, dry_run: bool) -> None:
+    """将 seed 目录打包为 cloud-init ISO。"""
     seed_iso.parent.mkdir(parents=True, exist_ok=True)
     if seed_iso.exists():
         if dry_run:
@@ -152,6 +158,7 @@ def build_seed_iso(seed_dir: Path, seed_iso: Path, dry_run: bool) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """构建 qemu_prepare CLI 参数。"""
     parser = argparse.ArgumentParser(description="Prepare QEMU runtime for OTA demo")
     parser.add_argument(
         "--qemu-runtime-dir",
@@ -194,6 +201,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """qemu_prepare 命令入口。"""
     args = build_parser().parse_args()
     runtime_dir: Path = args.qemu_runtime_dir
     base_image = runtime_dir / "base" / Path(args.base_image_url).name

@@ -14,6 +14,7 @@ from device_sim.runtime_state import BootState, boot_path, save_boot_state, slot
 
 
 def init_runtime(runtime_dir: Path, packages_dir: Path, initial_version: str, force: bool) -> None:
+    """初始化 guest 运行态目录与默认固件。"""
     source_dir = packages_dir / initial_version
     if not source_dir.exists():
         raise FileNotFoundError(f"missing initial package source: {source_dir}")
@@ -62,6 +63,7 @@ def init_runtime(runtime_dir: Path, packages_dir: Path, initial_version: str, fo
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """构建 guest 初始化 CLI 参数。"""
     parser = argparse.ArgumentParser(description="Initialize guest runtime for OTA QEMU demo")
     parser.add_argument(
         "--runtime-dir",
@@ -89,6 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """guest 初始化命令入口。"""
     args = build_parser().parse_args()
     init_runtime(
         runtime_dir=args.runtime_dir,

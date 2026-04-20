@@ -16,11 +16,13 @@ app = Flask(__name__)
 
 @app.get("/health")
 def health() -> tuple[dict[str, str], int]:
+    """健康检查接口。"""
     return {"status": "ok"}, 200
 
 
 @app.get("/manifest.json")
 def get_manifest():
+    """返回当前发布清单。"""
     if not MANIFEST_PATH.exists():
         abort(404, description="manifest.json not found, publish a release first")
     payload = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
@@ -29,6 +31,7 @@ def get_manifest():
 
 @app.get("/packages/<path:filename>")
 def download_package(filename: str):
+    """下载指定升级包。"""
     target = PACKAGES_DIR / filename
     if not target.exists():
         abort(404, description=f"package not found: {filename}")
@@ -36,6 +39,7 @@ def download_package(filename: str):
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """构建服务端 CLI 参数。"""
     parser = argparse.ArgumentParser(description="OTA server")
     parser.add_argument("--host", default="127.0.0.1", help="listen host")
     parser.add_argument("--port", type=int, default=8000, help="listen port")

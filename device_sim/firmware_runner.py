@@ -16,12 +16,15 @@ from device_sim.runtime_state import ensure_runtime_layout, load_boot_state, slo
 
 @dataclass(frozen=True)
 class FirmwareInfo:
+    """固件描述信息。"""
+
     version: str
     message: str
     step: int
 
 
 def parse_firmware_info(current_dir: Path) -> FirmwareInfo:
+    """解析 slot 中 app.txt 的固件信息。"""
     app_file = current_dir / "app.txt"
     if not app_file.exists():
         raise FileNotFoundError(f"missing firmware file: {app_file}")
@@ -47,6 +50,7 @@ def parse_firmware_info(current_dir: Path) -> FirmwareInfo:
 
 
 def load_counter(state_path: Path) -> int:
+    """读取业务计数器。"""
     if not state_path.exists():
         return 0
     payload = json.loads(state_path.read_text(encoding="utf-8"))
@@ -59,6 +63,7 @@ def load_counter(state_path: Path) -> int:
 
 
 def save_counter(state_path: Path, counter: int) -> None:
+    """持久化业务计数器。"""
     state_path.parent.mkdir(parents=True, exist_ok=True)
     state_path.write_text(
         json.dumps({"counter": counter}, ensure_ascii=True, indent=2) + "\n",
@@ -67,6 +72,7 @@ def save_counter(state_path: Path, counter: int) -> None:
 
 
 def save_runner_status(status_path: Path, slot: str, version: str, counter: int, ticks_since_start: int) -> None:
+    """写入 runner 心跳状态，供 agent 确认 pending。"""
     status_path.parent.mkdir(parents=True, exist_ok=True)
     status_path.write_text(
         json.dumps(
@@ -86,6 +92,7 @@ def save_runner_status(status_path: Path, slot: str, version: str, counter: int,
 
 
 def check_health(firmware_dir: Path) -> None:
+    """执行固件健康检查。"""
     health_file = firmware_dir / "health.txt"
     if not health_file.exists():
         raise RuntimeError(f"missing health file: {health_file}")
@@ -95,6 +102,7 @@ def check_health(firmware_dir: Path) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """构建 runner CLI 参数。"""
     parser = argparse.ArgumentParser(description="device firmware runner")
     parser.add_argument(
         "--runtime-dir",
@@ -123,6 +131,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """固件 runner 命令入口。"""
     args = build_parser().parse_args()
     runtime_dir = args.runtime_dir
     try:

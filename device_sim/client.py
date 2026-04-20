@@ -31,11 +31,15 @@ from device_sim.runtime_state import (
 
 
 class OtaError(RuntimeError):
+    """OTA 流程中的业务错误。"""
+
     pass
 
 
 @dataclass(frozen=True)
 class Manifest:
+    """OTA 发布清单。"""
+
     version: str
     package: str
     url: str
@@ -44,6 +48,7 @@ class Manifest:
 
     @staticmethod
     def from_dict(data: dict[str, str]) -> "Manifest":
+        """从字典构建并校验 manifest。"""
         required = ("version", "package", "url", "sha256", "signature")
         missing = [key for key in required if key not in data]
         if missing:
@@ -58,6 +63,7 @@ class Manifest:
 
 
 def parse_version(value: str) -> tuple[int, ...]:
+    """将 x.y.z 版本号解析为整数元组用于比较。"""
     try:
         return tuple(int(part) for part in value.split("."))
     except ValueError as exc:
@@ -65,6 +71,7 @@ def parse_version(value: str) -> tuple[int, ...]:
 
 
 def load_current_version(metadata_path: Path) -> str:
+    """读取设备当前版本。"""
     if not metadata_path.exists():
         raise OtaError(f"缺少设备元数据: {metadata_path}")
     payload = json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -75,6 +82,7 @@ def load_current_version(metadata_path: Path) -> str:
 
 
 def save_current_version(metadata_path: Path, version: str) -> None:
+    """写入设备当前版本。"""
     metadata_path.write_text(
         json.dumps({"version": version}, ensure_ascii=True, indent=2) + "\n",
         encoding="utf-8",
@@ -82,6 +90,7 @@ def save_current_version(metadata_path: Path, version: str) -> None:
 
 
 def fetch_manifest(manifest_url: str, timeout: int) -> Manifest:
+    """拉取并解析远端 manifest。"""
     response = requests.get(manifest_url, timeout=timeout)
     response.raise_for_status()
     data = response.json()
@@ -91,6 +100,7 @@ def fetch_manifest(manifest_url: str, timeout: int) -> Manifest:
 
 
 def download_package(url: str, output_path: Path, timeout: int) -> None:
+    """下载 OTA 包到本地文件。"""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with requests.get(url, timeout=timeout, stream=True) as response:
         response.raise_for_status()
@@ -101,12 +111,14 @@ def download_package(url: str, output_path: Path, timeout: int) -> None:
 
 
 def verify_sha256(package_path: Path, expected_sha256: str) -> None:
+    """校验升级包 SHA256。"""
     actual = hashlib.sha256(package_path.read_bytes()).hexdigest()
     if actual != expected_sha256:
         raise OtaError(f"SHA256 校验失败，expected={expected_sha256}, actual={actual}")
 
 
 def verify_signature(package_path: Path, signature_b64: str, public_key_path: Path) -> None:
+    """使用设备公钥验签升级包。"""
     public_key = load_pem_public_key(public_key_path.read_bytes())
     if not isinstance(public_key, Ed25519PublicKey):
         raise OtaError("公钥类型无效：需要 Ed25519 公钥")
@@ -116,6 +128,7 @@ def verify_signature(package_path: Path, signature_b64: str, public_key_path: Pa
 
 
 def health_check(current_dir: Path) -> None:
+    """检查升级后健康状态。"""
     health_file = current_dir / "health.txt"
     if not health_file.exists():
         raise OtaError("升级后健康检查失败：缺少 health.txt")
@@ -125,6 +138,7 @@ def health_check(current_dir: Path) -> None:
 
 
 def extract_to_slot(package_path: Path, target_slot_dir: Path) -> None:
+    """解压升级包到目标 slot。"""
     if target_slot_dir.exists():
         shutil.rmtree(target_slot_dir)
     target_slot_dir.mkdir(parents=True, exist_ok=True)
@@ -139,6 +153,7 @@ def mark_pending_update(
     target_version: str,
     previous_version: str,
 ) -> None:
+    """切换 active slot 并标记 pending 状态。"""
     target_slot = other_slot(current_boot.active_slot)
     save_boot_state(
         boot_path(runtime_dir),
@@ -155,6 +170,7 @@ def mark_pending_update(
 
 
 def confirm_pending_update(runtime_dir: Path) -> bool:
+    """确认 pending 升级成功并清理 pending 字段。"""
     state = load_boot_state(boot_path(runtime_dir))
     if state.pending_slot is None:
         return False
@@ -173,6 +189,7 @@ def confirm_pending_update(runtime_dir: Path) -> bool:
 
 
 def rollback_pending_update(runtime_dir: Path) -> bool:
+    """回滚 pending 升级到 previous slot/version。"""
     state = load_boot_state(boot_path(runtime_dir))
     if state.pending_slot is None:
         return False
@@ -201,6 +218,7 @@ def run_update(
     timeout: int,
     defer_confirm: bool = False,
 ) -> bool:
+    """执行一次 OTA 检查与升级流程。"""
     runtime_dir.mkdir(parents=True, exist_ok=True)
     ensure_runtime_layout(runtime_dir)
     metadata_path = runtime_dir / "metadata.json"
@@ -247,6 +265,7 @@ def run_update(
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """构建设备客户端 CLI 参数。"""
     parser = argparse.ArgumentParser(description="OTA device simulator")
     parser.add_argument("--server", default="http://127.0.0.1:8000", help="OTA server base URL")
     parser.add_argument(
@@ -266,6 +285,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """设备客户端命令入口。"""
     args = build_parser().parse_args()
     try:
         run_update(

@@ -28,12 +28,15 @@ from device_sim.runtime_state import boot_path, ensure_runtime_layout, load_boot
 
 @dataclass(frozen=True)
 class RunnerStatus:
+    """runner 状态快照。"""
+
     slot: str
     version: str
     ticks_since_start: int
 
 
 def load_runner_status(status_path: Path) -> RunnerStatus:
+    """读取并校验 runner_status.json。"""
     if not status_path.exists():
         raise FileNotFoundError(f"missing runner status: {status_path}")
     payload = json.loads(status_path.read_text(encoding="utf-8"))
@@ -53,6 +56,7 @@ def load_runner_status(status_path: Path) -> RunnerStatus:
 
 
 def manifest_identity(manifest) -> str:
+    """生成 manifest 指纹用于失败发布阻断。"""
     # Use full manifest fingerprint to avoid over-blocking by version only.
     return "|".join(
         [
@@ -66,6 +70,7 @@ def manifest_identity(manifest) -> str:
 
 
 def start_runner(runtime_dir: Path, tick_interval: float, slot: str) -> subprocess.Popen[bytes]:
+    """启动固件 runner 子进程。"""
     runner_path = Path(__file__).resolve().parent / "firmware_runner.py"
     command = [
         sys.executable,
@@ -82,6 +87,7 @@ def start_runner(runtime_dir: Path, tick_interval: float, slot: str) -> subproce
 
 
 def stop_runner(process: subprocess.Popen[bytes], timeout: float = 5.0) -> None:
+    """停止固件 runner 子进程。"""
     if process.poll() is not None:
         return
     process.terminate()
@@ -98,12 +104,14 @@ def restart_runner(
     tick_interval: float,
     slot: str,
 ) -> subprocess.Popen[bytes]:
+    """重启固件 runner。"""
     print("[agent] OTA 完成，重启固件进程", flush=True)
     stop_runner(process)
     return start_runner(runtime_dir, tick_interval, slot)
 
 
 def reboot_system(command: str) -> None:
+    """执行系统重启命令。"""
     cmd = shlex.split(command)
     if not cmd:
         raise ValueError("system reboot command 不能为空")
@@ -112,6 +120,7 @@ def reboot_system(command: str) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """构建 agent CLI 参数。"""
     parser = argparse.ArgumentParser(description="device OTA agent")
     parser.add_argument("--server", default="http://127.0.0.1:8000", help="OTA server base URL")
     parser.add_argument(
@@ -156,6 +165,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """常驻 OTA agent 入口。"""
     args = build_parser().parse_args()
     runtime_dir: Path = args.runtime_dir
     ensure_runtime_layout(runtime_dir)
